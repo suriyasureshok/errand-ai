@@ -6,7 +6,7 @@ from src.application.config import Config
 from src.domain.interfaces.ai_provider import AIProvider
 
 
-class OllamaProvider(AIProvider):
+class NvidiaNIMProvider(AIProvider):
     def __init__(self, config: Config) -> None:
         self._config = config
         self._client = OpenAI(

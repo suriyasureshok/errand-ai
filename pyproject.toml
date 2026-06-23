@@ -1,0 +1,15 @@
+[project]
+name = "errand-ai"
+version = "0.1.0"
+description = "A self-hosted, containerized AI test remediation system that continues your local testing workflow when you temporarily step away from your computer."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pydantic>=2.13.4",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "python-telegram-bot>=22.8",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
