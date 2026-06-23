@@ -1,21 +1,31 @@
 from typing import Any
 
-from src.domain.interfaces import AIProvider, BaseAgent
-from src.domain.models import FailureAnalysis
+from src.application.session_manager import SessionManager
+from src.domain.interfaces.agent import BaseAgent
+from src.domain.interfaces.ai_provider import AIProvider
+from src.domain.models.failure_analysis import FailureAnalysis
 
 
 class LogAnalyzerAgent(BaseAgent):
-    """
-    Analyzes failed test output and extracts
-    structured debugging information.
-    """
-
-    def __init__(self, ai_provider: AIProvider):
+    def __init__(
+        self,
+        ai_provider: AIProvider,
+        session_manager: SessionManager,
+    ) -> None:
         self.ai_provider = ai_provider
+        self.session_manager = session_manager
 
-    def execute(self, context: dict[str, Any]) -> dict[str, Any]:
-        stdout = context.get("test_stdout", "")
-        stderr = context.get("test_stderr", "")
+    def execute(
+        self,
+        context: dict[str, Any],
+    ) -> dict[str, Any]:
+        stdout = context["test_stdout"]
+        stderr = context["test_stderr"]
+
+        self.session_manager.append_event(
+            "log_analysis_started",
+            "Analyzing failed test output",
+        )
 
         prompt = f"""
 Analyze the following test failure.
@@ -26,7 +36,7 @@ Return:
 2. Root cause summary
 3. Relevant source files
 4. Relevant test files
-5. Relevant modules
+5. Related modules
 
 STDOUT:
 {stdout}
@@ -35,12 +45,17 @@ STDERR:
 {stderr}
 """
 
-        response = self.ai_provider.run(
+        analysis: FailureAnalysis = self.ai_provider.run(
             prompt=prompt,
-            system_prompt="You are an expert software debugging assistant.",
+            system_prompt=("You are an expert software " "debugging assistant."),
             response_schema=FailureAnalysis,
         )
 
-        context["failure_analysis"] = response
+        self.session_manager.append_event(
+            "log_analysis_completed",
+            analysis.error_type,
+        )
+
+        context["failure_analysis"] = analysis
 
         return context

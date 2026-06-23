@@ -1,24 +1,32 @@
+import asyncio
 from typing import Any
 
+from src.application.session_manager import SessionManager
 from src.domain.interfaces.agent import BaseAgent
 from src.domain.interfaces.ai_provider import AIProvider
 from src.domain.models.context_package import ContextPackage
 from src.domain.models.patch_recommendation import PatchRecommendation
+from src.infrastructure.notifications.telegram import TelegramClient
 
 
 class PatchGeneratorAgent(BaseAgent):
-    """
-    Generates a proposed patch using the configured
-    LLM provider.
-    """
-
-    def __init__(self, ai_provider: AIProvider) -> None:
+    def __init__(
+        self,
+        ai_provider: AIProvider,
+        telegram_client: TelegramClient,
+        session_manager: SessionManager,
+    ) -> None:
         self.ai_provider = ai_provider
+        self.telegram_client = telegram_client
+        self.session_manager = session_manager
 
-    def execute(self, context: dict[str, Any]) -> dict[str, Any]:
+    def execute(
+        self,
+        context: dict[str, Any],
+    ) -> dict[str, Any]:
         package: ContextPackage = context["context_package"]
 
-        prompt: str = self._build_prompt(package)
+        prompt = self._build_prompt(package)
 
         recommendation: PatchRecommendation = self.ai_provider.run(
             prompt=prompt,
@@ -27,8 +35,31 @@ class PatchGeneratorAgent(BaseAgent):
 
         context["patch_recommendation"] = recommendation
 
-        # Placeholder for future approval workflow
-        context["approval_required"] = True
+        self.session_manager.save_patch(
+            retry_number=context["retry_number"],
+            diff_content=recommendation.unified_diff,
+        )
+
+        self.session_manager.append_event(
+            "patch_generated",
+            recommendation.root_cause,
+        )
+
+        approval_message = f"""
+Root Cause:
+{recommendation.root_cause}
+
+Proposed Solution:
+{recommendation.proposed_solution}
+
+Diff:
+
+{recommendation.unified_diff}
+"""
+
+        asyncio.run(self.telegram_client.request_approval(approval_message))
+
+        context["awaiting_approval"] = True
 
         return context
 
@@ -47,12 +78,10 @@ FILE: {context_file.path}
 """
             )
 
-        files_text: str = "\n\n".join(file_sections)
+        files_text = "\n\n".join(file_sections)
 
         return f"""
 You are an expert software debugging assistant.
-
-Analyze the failure.
 
 ERROR TYPE:
 {package.error_type}
@@ -63,11 +92,11 @@ ERROR SUMMARY:
 FILES:
 {files_text}
 
-Tasks:
+Requirements:
 
-1. Determine the root cause.
+1. Determine the exact root cause.
 2. Propose the safest fix.
-3. Generate a unified diff patch.
-4. Modify only the necessary files.
-5. Avoid unrelated changes.
+3. Generate a valid unified diff.
+4. Modify only necessary files.
+5. Do not introduce unrelated changes.
 """
