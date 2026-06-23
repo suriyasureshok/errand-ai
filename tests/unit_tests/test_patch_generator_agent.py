@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import AsyncMock, Mock, patch
 
 from src.agents.patch_generator_agent import PatchGeneratorAgent
@@ -52,8 +53,11 @@ def test_generate_patch() -> None:
         "retry_number": 1,
     }
 
-    with patch("asyncio.run") as mock_asyncio:
+    with patch("asyncio.run") as mock_run:
         result = agent.execute(context)
+
+    coroutine = mock_run.call_args.args[0]
+    asyncio.run(coroutine)
 
     assert result["patch_recommendation"] == recommendation
 
@@ -62,8 +66,6 @@ def test_generate_patch() -> None:
     mock_ai_provider.run.assert_called_once()
 
     mock_session_manager.save_patch.assert_called_once()
-
-    mock_asyncio.assert_called_once()
 
 
 def test_prompt_contains_context() -> None:
