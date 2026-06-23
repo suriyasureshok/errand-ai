@@ -1,14 +1,8 @@
 from typing import Any
 
-from src.application.session_manager import (
-    SessionManager,
-)
-from src.domain.interfaces.agent import (
-    BaseAgent,
-)
-from src.domain.models.patch_recommendation import (
-    PatchRecommendation,
-)
+from src.application.session_manager import SessionManager
+from src.domain.interfaces.agent import BaseAgent
+from src.domain.models.patch_recommendation import PatchRecommendation
 
 
 class GuardrailAgent(BaseAgent):

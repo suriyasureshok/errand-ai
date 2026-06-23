@@ -1,18 +1,10 @@
 import asyncio
 from typing import Any
 
-from src.application.session_manager import (
-    SessionManager,
-)
-from src.domain.interfaces.agent import (
-    BaseAgent,
-)
-from src.domain.models.patch_recommendation import (
-    PatchRecommendation,
-)
-from src.infrastructure.notifications.telegram import (
-    TelegramClient,
-)
+from src.application.session_manager import SessionManager
+from src.domain.interfaces.agent import BaseAgent
+from src.domain.models.patch_recommendation import PatchRecommendation
+from src.infrastructure.notifications.telegram import TelegramClient
 
 
 class ApprovalAgent(BaseAgent):

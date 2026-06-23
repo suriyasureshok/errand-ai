@@ -1,15 +1,9 @@
 from pathlib import Path
 from typing import Any
 
-from src.application.session_manager import (
-    SessionManager,
-)
-from src.domain.interfaces.agent import (
-    BaseAgent,
-)
-from src.infrastructure.git.git_client import (
-    GitClient,
-)
+from src.application.session_manager import SessionManager
+from src.domain.interfaces.agent import BaseAgent
+from src.infrastructure.git.git_client import GitClient
 
 
 class GitAgent(BaseAgent):
