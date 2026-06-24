@@ -25,15 +25,20 @@ async def test_create_checkpoint(mock_exec: AsyncMock, git_client: GitClient):
 
     # Verify 'git add .' was called
     mock_exec.assert_any_call(
-        "git", "add", ".",
+        "git",
+        "add",
+        ".",
         cwd=git_client.workspace,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-    
+
     # Verify 'git commit' was called with the correct message
     mock_exec.assert_any_call(
-        "git", "commit", "-m", "Errand AI Retry #2",
+        "git",
+        "commit",
+        "-m",
+        "Errand AI Retry #2",
         cwd=git_client.workspace,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,

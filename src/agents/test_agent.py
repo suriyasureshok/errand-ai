@@ -1,48 +1,59 @@
+"""Agent responsible for executing the target codebase's test suite.
+
+This module provides the TestAgent, which runs the configured test command
+(defaulting to pytest) in the target workspace, captures the raw output,
+and persists it via the LogManager.
+"""
+
 import asyncio
 from pathlib import Path
-from typing import Any
 
-from src.application import SessionManager
-from src.domain.interfaces import BaseAgent, Notifier
+from src.domain.interfaces import BaseAgent
+from src.domain.models import Session
 from src.domain.models import TestResult
-from src.utils.logger import get_logger
+from src.infrastructure.filesystem import LogManager
+from src.utils import get_logger
 
 logger = get_logger(__name__)
 
 
-class TestAgent(BaseAgent[Any, TestResult]):
-    SCRIPT_NAME = "errand_ai.sh"
+class TestAgent(BaseAgent[Session, TestResult]):
+    """Agent that runs the test suite and captures the execution state.
+
+    Attributes:
+        workspace (Path): The root directory of the target codebase.
+        log_manager (LogManager): Infrastructure manager for saving test logs.
+        test_command (str): The command used to run the tests. Defaults to 'pytest'.
+    """
 
     def __init__(
-        self,
-        session_manager: SessionManager,
-        notifier: Notifier,
+        self, workspace: Path, log_manager: LogManager, test_command: str = "pytest"
     ) -> None:
-        self.session_manager = session_manager
-        self.notifier = notifier
+        """Initializes the TestAgent.
 
-    async def execute(self, input_data: Any = None) -> TestResult:
-        workspace = self.session_manager.workspace
-        script_path = workspace / self.SCRIPT_NAME
+        Args:
+            workspace (Path): The target codebase root.
+            log_manager (LogManager): The infrastructure component for saving logs.
+            test_command (str, optional): The shell command to trigger tests. Defaults to "pytest".
+        """
+        self.workspace = workspace
+        self.log_manager = log_manager
+        self.test_command = test_command
 
-        if not script_path.exists():
-            logger.error(f"{self.SCRIPT_NAME} not found in {workspace}")
-            raise FileNotFoundError(f"{self.SCRIPT_NAME} not found in {workspace}")
+    async def execute(self, input_data: Session) -> TestResult:
+        """Executes the test suite asynchronously.
 
-        # Fetch the current state from the session manager dynamically
-        session = self.session_manager.load_session()
-        current_retry = session.current_retry
+        Args:
+            input_data (Session): The current pipeline session state.
 
-        self.session_manager.append_event(
-            "test_started", f"Executing {self.SCRIPT_NAME} (Retry {current_retry})"
-        )
-        logger.info(f"Running test script: {self.SCRIPT_NAME}...")
+        Returns:
+            TestResult: The domain model containing the test execution outcome.
+        """
+        logger.info(f"Running tests for retry loop {input_data.current_retry}...")
 
-        # Non-blocking subprocess execution
-        process = await asyncio.create_subprocess_exec(
-            "bash",
-            str(script_path),
-            cwd=workspace,
+        process = await asyncio.create_subprocess_shell(
+            self.test_command,
+            cwd=self.workspace,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -51,36 +62,25 @@ class TestAgent(BaseAgent[Any, TestResult]):
 
         stdout = stdout_bytes.decode("utf-8")
         stderr = stderr_bytes.decode("utf-8")
-        exit_code = process.returncode
-        tests_passed = exit_code == 0
+        exit_code = process.returncode or 0
 
-        log_content = f"STDOUT\n======\n\n{stdout}\n\nSTDERR\n======\n\n{stderr}\n"
+        # Pytest typically returns 0 for success, 1 for test failures, and 2+ for errors
+        passed = exit_code == 0
 
-        log_file = self.session_manager.save_log(
-            retry_number=current_retry,
-            content=log_content,
+        full_output = f"--- STDOUT ---\n{stdout}\n--- STDERR ---\n{stderr}"
+        log_path = self.log_manager.save_test_output(
+            input_data.current_retry, full_output
         )
 
-        if tests_passed:
-            logger.info("Tests passed successfully.")
-            self.session_manager.mark_success()
-            self.session_manager.append_event("workflow_completed", "All tests passed")
-            await self.notifier.notify_success("Test execution completed successfully.")
+        if passed:
+            logger.info("Test suite passed successfully.")
         else:
-            logger.warning(
-                f"Tests failed with exit code {exit_code}. Initiating remediation."
-            )
-            self.session_manager.append_event(
-                "workflow_continues", "Starting remediation workflow"
-            )
-            await self.notifier.notify_failure(
-                "Tests failed. Starting remediation workflow."
-            )
+            logger.warning(f"Test suite failed with exit code {exit_code}.")
 
         return TestResult(
-            passed=tests_passed,
+            passed=passed,
             stdout=stdout,
             stderr=stderr,
             exit_code=exit_code,
-            log_file_path=str(log_file),
+            log_file_path=str(log_path),
         )

@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from src.agents.test_agent import TestAgent
+from src.application.config import Config
 from src.application.session_manager import SessionManager
 from src.infrastructure.notifications.telegram import TelegramNotifier
-from src.application.config import Config
 
 
 @pytest.fixture

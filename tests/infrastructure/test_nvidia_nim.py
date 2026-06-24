@@ -29,7 +29,7 @@ async def test_run_without_schema(nim_provider: NvidiaNIMProvider):
     nim_provider._client.chat.completions.create = AsyncMock(return_value=mock_response)
 
     result = await nim_provider.run(prompt="Hello", system_prompt="Be polite.")
-    
+
     assert result == "This is a mock response."
     nim_provider._client.chat.completions.create.assert_called_once()
 
@@ -43,7 +43,7 @@ async def test_run_with_schema(nim_provider: NvidiaNIMProvider):
     nim_provider._client.chat.completions.create = AsyncMock(return_value=mock_response)
 
     result = await nim_provider.run(prompt="Calculate", response_schema=MockSchema)
-    
+
     assert isinstance(result, MockSchema)
     assert result.reasoning == "math"
     assert result.result == 42

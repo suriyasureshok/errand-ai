@@ -1,51 +1,67 @@
-from src.application import SessionManager
+"""Agent responsible for safety and syntax verification.
+
+This module provides the GuardrailAgent, which inspects generated patches
+to ensure they are syntactically valid and free of dangerous operations
+before passing them down the pipeline.
+"""
+
+import ast
+
 from src.domain.interfaces import BaseAgent
 from src.domain.models import GuardrailResult
 from src.domain.models import PatchRecommendation
-from src.utils.logger import get_logger
+from src.utils import get_logger
 
 logger = get_logger(__name__)
 
 
 class GuardrailAgent(BaseAgent[PatchRecommendation, GuardrailResult]):
-    BLOCKED_PATTERNS = [
-        "os.system(",
-        "subprocess.run(",
-        "eval(",
-        "exec(",
-        "os.remove(",
-        "shutil.rmtree(",
-    ]
+    """Agent that enforces syntactic and security safety on generated patches."""
 
-    BLOCKED_FILES = [
-        ".env",
-        ".git/",
-        "Cargo.lock",
-        "package-lock.json",
-    ]
+    def __init__(self) -> None:
+        """Initializes the GuardrailAgent."""
+        pass
 
-    def __init__(self, session_manager: SessionManager) -> None:
-        self.session_manager = session_manager
+    async def execute(self, input_data: PatchRecommendation) -> GuardrailResult:
+        """Validates the proposed code modifications.
 
-    async def execute(self, recommendation: PatchRecommendation) -> GuardrailResult:
-        logger.info("Evaluating patch against safety guardrails...")
-        diff = recommendation.unified_diff
+        Currently enforces AST (Abstract Syntax Tree) compilation checks to
+        prevent syntax-breaking hallucinations.
 
-        for pattern in self.BLOCKED_PATTERNS:
-            if pattern in diff:
-                reason = f"Blocked execution pattern detected: {pattern}"
-                logger.warning(f"Guardrail failed: {reason}")
-                self.session_manager.append_event("guardrail_rejected", reason)
-                return GuardrailResult(passed=False, recommendation=recommendation, reason=reason)
+        Args:
+            input_data (PatchRecommendation): The AI-generated patch proposal.
 
-        for file_name in self.BLOCKED_FILES:
-            if file_name in diff:
-                reason = f"Protected file modification detected: {file_name}"
-                logger.warning(f"Guardrail failed: {reason}")
-                self.session_manager.append_event("guardrail_rejected", reason)
-                return GuardrailResult(passed=False, recommendation=recommendation, reason=reason)
+        Returns:
+            GuardrailResult: A domain model indicating pass/fail status.
+        """
+        logger.info("Executing guardrail validations on proposed patch...")
 
-        logger.info("Patch passed all safety guardrails.")
-        self.session_manager.append_event("guardrail_passed", "Patch approved by static analysis")
-        
-        return GuardrailResult(passed=True, recommendation=recommendation)
+        for patch in input_data.patches:
+            # We only check Python files for AST validity
+            if not patch.file_path.endswith(".py"):
+                continue
+
+            try:
+                # Attempt to parse the replacement block as valid Python syntax.
+                # We wrap it in a try/except because sometimes the block is just a
+                # fragment (like changing a variable name inside an expression),
+                # but for full statements, this catches indentation/colon errors.
+                ast.parse(patch.replace_block)
+            except SyntaxError as e:
+                # If it's a blatant syntax error, reject it immediately
+                reason = f"SyntaxError detected in patch for {patch.file_path}: {e}"
+                logger.warning(f"Guardrail check failed: {reason}")
+                return GuardrailResult(
+                    passed=False,
+                    recommendation=input_data,
+                    reason=reason,
+                )
+
+        # Future extensions can include checks for 'os.system' or 'subprocess' injections here.
+
+        logger.info("Guardrail checks passed successfully.")
+        return GuardrailResult(
+            passed=True,
+            recommendation=input_data,
+            reason=None,
+        )

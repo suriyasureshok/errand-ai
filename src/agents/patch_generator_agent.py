@@ -1,73 +1,80 @@
-from src.application import SessionManager
+"""Agent responsible for generating code fixes.
+
+This module provides the PatchGeneratorAgent, which feeds the aggregated
+context into an LLM and outputs a structured PatchRecommendation.
+"""
+
+import json
+
 from src.domain.interfaces import BaseAgent
 from src.domain.interfaces import AIProvider
 from src.domain.models import ContextPackage
 from src.domain.models import PatchRecommendation
-from src.utils.logger import get_logger
+from src.utils import get_logger
 
 logger = get_logger(__name__)
 
+_SYSTEM_PROMPT = """You are an elite, autonomous software engineer.
+You will be provided with a set of source code files and an error summary.
+Your objective is to fix the error by proposing exact, byte-for-byte search and replace blocks.
+CRITICAL RULES:
+1. The `search_block` must match the existing code in the file EXACTLY, including all indentation and newlines.
+2. The `replace_block` must contain the fixed code with identical relative indentation.
+3. Keep the patches as minimal as possible to avoid unintended side effects."""
+
 
 class PatchGeneratorAgent(BaseAgent[ContextPackage, PatchRecommendation]):
-    def __init__(
-        self,
-        ai_provider: AIProvider,
-        session_manager: SessionManager,
-    ) -> None:
+    """Agent that formulates actionable codebase modifications.
+
+    Attributes:
+        ai_provider (AIProvider): The configured LLM inference engine.
+    """
+
+    def __init__(self, ai_provider: AIProvider) -> None:
+        """Initializes the PatchGeneratorAgent.
+
+        Args:
+            ai_provider (AIProvider): The infrastructure provider for AI inference.
+        """
         self.ai_provider = ai_provider
-        self.session_manager = session_manager
 
-    async def execute(self, package: ContextPackage) -> PatchRecommendation:
-        logger.info("Generating patch recommendation based on collected context...")
-        
-        prompt = self._build_prompt(package)
+    async def execute(self, input_data: ContextPackage) -> PatchRecommendation:
+        """Generates a code modification proposal based on the context.
 
-        recommendation: PatchRecommendation = await self.ai_provider.run(
+        Args:
+            input_data (ContextPackage): The bundled source code and error data.
+
+        Returns:
+            PatchRecommendation: The structured, platform-agnostic patch proposal.
+
+        Raises:
+            ValueError: If the AI provider fails to return a valid schema.
+        """
+        logger.info("Generating patch recommendation via AI...")
+
+        # Construct a highly detailed prompt containing all file context
+        files_context = "\n\n".join(
+            f"--- FILE: {f.path} ---\n```python\n{f.content}\n```"
+            for f in input_data.collected_files
+        )
+
+        prompt = (
+            f"ERROR TYPE: {input_data.error_type}\n"
+            f"ERROR SUMMARY: {input_data.error_summary}\n\n"
+            f"Below are the files relevant to the issue:\n\n{files_context}\n\n"
+            f"Please generate the exact search-and-replace patches required to fix this issue."
+        )
+
+        recommendation = await self.ai_provider.run(
             prompt=prompt,
-            system_prompt="You are an expert software engineer. Always output strictly valid unified diffs.",
+            system_prompt=_SYSTEM_PROMPT,
             response_schema=PatchRecommendation,
         )
 
-        session = self.session_manager.load_session()
+        if not isinstance(recommendation, PatchRecommendation):
+            raise ValueError("AI Provider returned an invalid response type.")
 
-        # Persist the proposed diff to the .errand-ai/patches directory
-        self.session_manager.save_patch(
-            retry_number=session.current_retry,
-            diff_content=recommendation.unified_diff,
+        logger.debug(
+            f"Patch generated with {len(recommendation.patches)} modifications."
         )
-
-        self.session_manager.append_event(
-            "patch_generated",
-            f"Root Cause: {recommendation.root_cause[:50]}..."
-        )
-
-        logger.info("Patch generation complete.")
-
         return recommendation
-
-    def _build_prompt(self, package: ContextPackage) -> str:
-        file_sections: list[str] = []
-        for context_file in package.collected_files:
-            file_sections.append(f"FILE: {context_file.path}\n\n{context_file.content}")
-        files_text = "\n\n".join(file_sections)
-
-        return f"""
-Analyze the following code context to resolve the test failure.
-
-ERROR TYPE:
-{package.error_type}
-
-ERROR SUMMARY:
-{package.error_summary}
-
-FILES:
-{files_text}
-
-Requirements:
-1. Determine the exact root cause of the error.
-2. Propose the safest logical fix.
-3. Generate the `patches` array using exact Search and Replace blocks. 
-   - The `search_block` MUST match the existing code exactly, including all indentation.
-   - Keep the blocks concise (only include the lines being changed and 1-2 context lines).
-4. Generate a `unified_diff` string purely for the human reviewer to read.
-"""

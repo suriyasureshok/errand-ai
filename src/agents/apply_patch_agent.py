@@ -1,6 +1,11 @@
-from pathlib import Path
+"""Agent responsible for applying codebase modifications.
 
-from src.application import SessionManager
+This module provides the ApplyPatchAgent, which takes an approved
+PatchRecommendation and executes the exact search-and-replace string
+replacements against the local filesystem via the PatchManager.
+"""
+
+from src.application.session_manager import SessionManager
 from src.domain.interfaces import BaseAgent
 from src.domain.models import PatchRecommendation
 from src.utils.logger import get_logger
@@ -9,54 +14,64 @@ logger = get_logger(__name__)
 
 
 class ApplyPatchAgent(BaseAgent[PatchRecommendation, PatchRecommendation]):
+    """Agent that safely mutates the filesystem with approved fixes.
+
+    Attributes:
+        session_manager (SessionManager): The facade for persistence and
+            filesystem operations.
+    """
+
     def __init__(self, session_manager: SessionManager) -> None:
+        """Initializes the ApplyPatchAgent.
+
+        Args:
+            session_manager (SessionManager): The system state and file manager.
+        """
         self.session_manager = session_manager
 
-    async def execute(self, recommendation: PatchRecommendation) -> PatchRecommendation:
+    async def execute(self, input_data: PatchRecommendation) -> PatchRecommendation:
+        """Applies the approved patches to the target codebase.
+
+        Args:
+            input_data (PatchRecommendation): The validated and approved patch proposal.
+
+        Returns:
+            PatchRecommendation: The identical recommendation, passed down
+                the pipeline for final logging or verification.
+
+        Raises:
+            RuntimeError: If a file is missing or a search block cannot be found.
+        """
         logger.info("Applying approved patch via Pure Python Search/Replace...")
 
-        workspace = self.session_manager.workspace
         session = self.session_manager.load_session()
         retry_number = session.current_retry
 
-        for patch in recommendation.patches:
-            abs_path = workspace / patch.file_path
-            
-            if not abs_path.exists():
-                raise RuntimeError(f"Target file does not exist: {abs_path}")
+        # Delegate the actual file mutation to the highly-tested PatchManager
+        for patch in input_data.patches:
+            try:
+                self.session_manager.patch_manager.apply_search_replace(
+                    relative_path=patch.file_path,
+                    search_block=patch.search_block,
+                    replace_block=patch.replace_block,
+                )
+            except Exception as e:
+                self.session_manager.append_event(
+                    event_type="patch_application_failed",
+                    details=f"Failed on {patch.file_path}: {e}",
+                )
+                raise RuntimeError(f"Patch application failed: {e}")
 
-            # Read the raw file content
-            content = abs_path.read_text(encoding="utf-8")
-
-            # NORMALIZE EVERYTHING: This instantly neutralizes the Windows \r\n vs WSL \n clash.
-            content_normalized = content.replace("\r\n", "\n")
-            search_normalized = patch.search_block.replace("\r\n", "\n")
-            replace_normalized = patch.replace_block.replace("\r\n", "\n")
-
-            # Check if the LLM's search block actually exists in the file
-            if search_normalized not in content_normalized:
-                logger.error(f"Failed to find search block in {patch.file_path}")
-                logger.debug(f"SEARCH BLOCK:\n{search_normalized}")
-                self.session_manager.append_event("patch_application_failed", f"Search block not found in {patch.file_path}")
-                raise RuntimeError(f"Could not find the target code block in {patch.file_path}. The LLM hallucinated the existing code.")
-
-            # Apply the patch via strict string replacement
-            new_content = content_normalized.replace(search_normalized, replace_normalized)
-
-            # Write it back to disk safely
-            with open(abs_path, "w", encoding="utf-8", newline="\n") as f:
-                f.write(new_content)
-                
-            logger.debug(f"Successfully patched {patch.file_path}")
-
-        # Save the unified diff purely for history/logging purposes
-        patch_path = self.session_manager.patches_dir / f"retry-{retry_number}.diff"
-        patch_path.write_text(recommendation.unified_diff, encoding="utf-8")
-
-        logger.info("All files patched successfully using Search/Replace.")
-        self.session_manager.append_event(
-            "patch_applied", 
-            f"Successfully applied Python string replacement for retry #{retry_number}"
+        # Save the unified diff strictly for historical human review
+        self.session_manager.save_patch(
+            retry_number=retry_number,
+            diff_content=input_data.unified_diff,
         )
 
-        return recommendation
+        logger.info("All files patched successfully.")
+        self.session_manager.append_event(
+            event_type="patch_applied",
+            details=f"Successfully applied Python string replacement for retry #{retry_number}",
+        )
+
+        return input_data
