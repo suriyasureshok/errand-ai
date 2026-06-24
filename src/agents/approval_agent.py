@@ -5,7 +5,7 @@ pipeline execution until a human reviewer interacts with the configured
 notification infrastructure (e.g., Telegram).
 """
 
-from src.application import SessionManager
+from src.application.session_manager import SessionManager
 from src.domain.interfaces import BaseAgent
 from src.domain.interfaces import Notifier
 from src.domain.models import ApprovalResult
@@ -65,7 +65,7 @@ class ApprovalAgent(BaseAgent[PatchRecommendation, ApprovalResult]):
         )
 
         logger.info(f"Approval process concluded with status: {result.status.name}")
-        
+
         self.session_manager.append_event(
             event_type="approval_concluded",
             details=f"Status: {result.status.name} | Reason: {result.reason or 'None'}",

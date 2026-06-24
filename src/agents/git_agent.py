@@ -4,7 +4,7 @@ This module provides the GitAgent, which establishes a version control
 safety net before any destructive filesystem modifications occur.
 """
 
-from src.application import SessionManager
+from src.application.session_manager import SessionManager
 from src.domain.interfaces import BaseAgent
 from src.domain.interfaces import Repository
 from src.domain.models import PatchRecommendation

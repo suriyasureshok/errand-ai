@@ -41,7 +41,7 @@ class LogAnalyzerAgent(BaseAgent[TestResult, FailureAnalysis]):
 
         Returns:
             FailureAnalysis: The structured diagnostic schema.
-            
+
         Raises:
             ValueError: If the AI provider fails to return a valid schema.
         """
@@ -59,7 +59,7 @@ class LogAnalyzerAgent(BaseAgent[TestResult, FailureAnalysis]):
             system_prompt=_SYSTEM_PROMPT,
             response_schema=FailureAnalysis,
         )
-        
+
         # Type narrowing to satisfy static type checkers
         if not isinstance(analysis, FailureAnalysis):
             raise ValueError("AI Provider returned an invalid response type.")

@@ -20,7 +20,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the core source code into the container
 COPY src/ /app/src/
-COPY main.py /app/main.py
 
 # Execute the pipeline
 CMD ["python", "-m", "src.main"]

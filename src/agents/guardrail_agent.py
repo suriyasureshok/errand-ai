@@ -43,8 +43,8 @@ class GuardrailAgent(BaseAgent[PatchRecommendation, GuardrailResult]):
 
             try:
                 # Attempt to parse the replacement block as valid Python syntax.
-                # We wrap it in a try/except because sometimes the block is just a 
-                # fragment (like changing a variable name inside an expression), 
+                # We wrap it in a try/except because sometimes the block is just a
+                # fragment (like changing a variable name inside an expression),
                 # but for full statements, this catches indentation/colon errors.
                 ast.parse(patch.replace_block)
             except SyntaxError as e:

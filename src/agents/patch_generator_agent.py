@@ -46,7 +46,7 @@ class PatchGeneratorAgent(BaseAgent[ContextPackage, PatchRecommendation]):
 
         Returns:
             PatchRecommendation: The structured, platform-agnostic patch proposal.
-            
+
         Raises:
             ValueError: If the AI provider fails to return a valid schema.
         """
@@ -54,7 +54,7 @@ class PatchGeneratorAgent(BaseAgent[ContextPackage, PatchRecommendation]):
 
         # Construct a highly detailed prompt containing all file context
         files_context = "\n\n".join(
-            f"--- FILE: {f.path} ---\n```python\n{f.content}\n```" 
+            f"--- FILE: {f.path} ---\n```python\n{f.content}\n```"
             for f in input_data.collected_files
         )
 
@@ -74,5 +74,7 @@ class PatchGeneratorAgent(BaseAgent[ContextPackage, PatchRecommendation]):
         if not isinstance(recommendation, PatchRecommendation):
             raise ValueError("AI Provider returned an invalid response type.")
 
-        logger.debug(f"Patch generated with {len(recommendation.patches)} modifications.")
+        logger.debug(
+            f"Patch generated with {len(recommendation.patches)} modifications."
+        )
         return recommendation

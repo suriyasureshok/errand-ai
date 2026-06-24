@@ -26,7 +26,9 @@ class TestAgent(BaseAgent[Session, TestResult]):
         test_command (str): The command used to run the tests. Defaults to 'pytest'.
     """
 
-    def __init__(self, workspace: Path, log_manager: LogManager, test_command: str = "pytest") -> None:
+    def __init__(
+        self, workspace: Path, log_manager: LogManager, test_command: str = "pytest"
+    ) -> None:
         """Initializes the TestAgent.
 
         Args:
@@ -57,16 +59,18 @@ class TestAgent(BaseAgent[Session, TestResult]):
         )
 
         stdout_bytes, stderr_bytes = await process.communicate()
-        
+
         stdout = stdout_bytes.decode("utf-8")
         stderr = stderr_bytes.decode("utf-8")
         exit_code = process.returncode or 0
 
         # Pytest typically returns 0 for success, 1 for test failures, and 2+ for errors
         passed = exit_code == 0
-        
+
         full_output = f"--- STDOUT ---\n{stdout}\n--- STDERR ---\n{stderr}"
-        log_path = self.log_manager.save_test_output(input_data.current_retry, full_output)
+        log_path = self.log_manager.save_test_output(
+            input_data.current_retry, full_output
+        )
 
         if passed:
             logger.info("Test suite passed successfully.")

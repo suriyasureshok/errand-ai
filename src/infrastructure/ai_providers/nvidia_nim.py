@@ -30,6 +30,7 @@ class NvidiaNIMProvider(AIProvider):
             config (Config): Application configuration containing the API key and base URL.
         """
         self._config = config
+
         self._client = AsyncOpenAI(
             base_url=config.base_url,
             api_key=config.api_key,

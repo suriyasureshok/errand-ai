@@ -4,7 +4,7 @@ This module provides the RefactorAgent, which utilizes negative feedback
 from human reviewers or guardrails to prompt the LLM for a revised fix.
 """
 
-from src.application import SessionManager
+from src.application.session_manager import SessionManager
 from src.domain.interfaces import BaseAgent
 from src.domain.interfaces import AIProvider
 from src.domain.models import PatchRecommendation
@@ -44,12 +44,12 @@ class RefactorAgent(BaseAgent[RefactorRequest, PatchRecommendation]):
         """Generates a revised patch proposal.
 
         Args:
-            input_data (RefactorRequest): The bundle containing original context, 
+            input_data (RefactorRequest): The bundle containing original context,
                 the rejected patch, and the explicit rejection reason.
 
         Returns:
             PatchRecommendation: A newly generated, theoretically compliant patch.
-            
+
         Raises:
             ValueError: If the AI provider fails to return the required schema.
         """
@@ -93,7 +93,7 @@ class RefactorAgent(BaseAgent[RefactorRequest, PatchRecommendation]):
             str: The raw prompt string to send to the LLM.
         """
         file_sections = [
-            f"FILE: {f.path}\n\n```python\n{f.content}\n```" 
+            f"FILE: {f.path}\n\n```python\n{f.content}\n```"
             for f in request.package.collected_files
         ]
         files_text = "\n\n".join(file_sections)

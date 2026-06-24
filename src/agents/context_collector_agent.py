@@ -40,16 +40,14 @@ class ContextCollectorAgent(BaseAgent[FailureAnalysis, ContextPackage]):
         logger.info("Collecting source code context based on analysis...")
 
         collected_files: list[ContextFile] = []
-        
+
         # Combine unique file paths from both source and test lists
         target_files = set(input_data.relevant_files + input_data.relevant_tests)
 
         for file_path in target_files:
             content = self.context_manager.read_source_file(file_path)
             if content is not None:
-                collected_files.append(
-                    ContextFile(path=file_path, content=content)
-                )
+                collected_files.append(ContextFile(path=file_path, content=content))
                 logger.debug(f"Included {file_path} in context package.")
             else:
                 logger.warning(f"Could not read {file_path} for context.")

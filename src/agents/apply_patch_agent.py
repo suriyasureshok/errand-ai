@@ -5,7 +5,7 @@ PatchRecommendation and executes the exact search-and-replace string
 replacements against the local filesystem via the PatchManager.
 """
 
-from src.application import SessionManager
+from src.application.session_manager import SessionManager
 from src.domain.interfaces import BaseAgent
 from src.domain.models import PatchRecommendation
 from src.utils.logger import get_logger
@@ -17,7 +17,7 @@ class ApplyPatchAgent(BaseAgent[PatchRecommendation, PatchRecommendation]):
     """Agent that safely mutates the filesystem with approved fixes.
 
     Attributes:
-        session_manager (SessionManager): The facade for persistence and 
+        session_manager (SessionManager): The facade for persistence and
             filesystem operations.
     """
 
@@ -36,7 +36,7 @@ class ApplyPatchAgent(BaseAgent[PatchRecommendation, PatchRecommendation]):
             input_data (PatchRecommendation): The validated and approved patch proposal.
 
         Returns:
-            PatchRecommendation: The identical recommendation, passed down 
+            PatchRecommendation: The identical recommendation, passed down
                 the pipeline for final logging or verification.
 
         Raises:
