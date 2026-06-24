@@ -7,8 +7,8 @@ commands to create safety checkpoints and extract uncommitted changes.
 import asyncio
 from pathlib import Path
 
-from src.domain.interfaces.repository import Repository
-from src.utils.logger import get_logger
+from src.domain.interfaces import Repository
+from src.utils import get_logger
 
 logger = get_logger(__name__)
 
@@ -30,17 +30,12 @@ class GitClient(Repository):
 
     async def _ensure_safe_directory(self) -> None:
         """Configures Git to trust the mounted workspace.
-
+        
         This prevents 'dubious ownership' errors when running inside Docker
         containers with mounted host volumes.
         """
         process = await asyncio.create_subprocess_exec(
-            "git",
-            "config",
-            "--global",
-            "--add",
-            "safe.directory",
-            str(self.workspace),
+            "git", "config", "--global", "--add", "safe.directory", str(self.workspace),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -55,9 +50,7 @@ class GitClient(Repository):
 
         # Stage all changes
         add_process = await asyncio.create_subprocess_exec(
-            "git",
-            "add",
-            ".",
+            "git", "add", ".",
             cwd=self.workspace,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -69,10 +62,7 @@ class GitClient(Repository):
 
         # Commit the checkpoint
         commit_process = await asyncio.create_subprocess_exec(
-            "git",
-            "commit",
-            "-m",
-            f"Errand AI Retry #{retry_number}",
+            "git", "commit", "-m", f"Errand AI Retry #{retry_number}",
             cwd=self.workspace,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -88,10 +78,9 @@ class GitClient(Repository):
     async def get_diff(self) -> str:
         """Retrieves the current uncommitted changes."""
         await self._ensure_safe_directory()
-
+        
         process = await asyncio.create_subprocess_exec(
-            "git",
-            "diff",
+            "git", "diff",
             cwd=self.workspace,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
