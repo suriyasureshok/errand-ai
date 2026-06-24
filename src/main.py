@@ -66,6 +66,7 @@ async def main() -> None:
     engine = WorkflowEngine(
         config=config,
         session_manager=session_manager,
+        notifier=notifier,
         test_agent=test_agent,
         log_analyzer=log_analyzer,
         context_collector=context_collector,
