@@ -3,9 +3,9 @@ from pathlib import Path
 import pytest
 
 from src.agents.context_collector_agent import ContextCollectorAgent
+from src.application.config import Config
 from src.application.session_manager import SessionManager
 from src.domain.models.failure_analysis import FailureAnalysis
-from src.application.config import Config
 
 
 @pytest.mark.asyncio
@@ -25,7 +25,7 @@ async def test_context_collector_execute(mock_config: Config, tmp_path: Path):
         summary="Missing colon",
         relevant_files=["app/main.py", "does_not_exist.py"],
         relevant_tests=[],
-        related_modules=[]
+        related_modules=[],
     )
 
     package = await agent.execute(analysis)

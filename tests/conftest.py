@@ -19,5 +19,5 @@ def mock_config(tmp_path: Path) -> Config:
     config.chat_id = "mock_chat_id"
     config.max_retries = 3
     config.approval_timeout_min = 10
-    
+
     return config
