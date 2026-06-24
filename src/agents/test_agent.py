@@ -9,8 +9,7 @@ import asyncio
 from pathlib import Path
 
 from src.domain.interfaces import BaseAgent
-from src.domain.models import Session
-from src.domain.models import TestResult
+from src.domain.models import Session, TestResult
 from src.infrastructure.filesystem import LogManager
 from src.utils import get_logger
 

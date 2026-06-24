@@ -5,8 +5,7 @@ by the LogAnalyzerAgent and bundles them into a package for patch generation.
 """
 
 from src.domain.interfaces import BaseAgent
-from src.domain.models import ContextFile, ContextPackage
-from src.domain.models import FailureAnalysis
+from src.domain.models import ContextFile, ContextPackage, FailureAnalysis
 from src.infrastructure.filesystem import ContextManager
 from src.utils import get_logger
 

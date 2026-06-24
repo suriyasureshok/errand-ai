@@ -4,10 +4,8 @@ This module provides the LogAnalyzerAgent, which uses an AIProvider to
 parse raw stdout/stderr dumps and extract a structured root-cause analysis.
 """
 
-from src.domain.interfaces import BaseAgent
-from src.domain.interfaces import AIProvider
-from src.domain.models import FailureAnalysis
-from src.domain.models import TestResult
+from src.domain.interfaces import AIProvider, BaseAgent
+from src.domain.models import FailureAnalysis, TestResult
 from src.utils import get_logger
 
 logger = get_logger(__name__)

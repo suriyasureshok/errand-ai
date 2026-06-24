@@ -5,10 +5,8 @@ from human reviewers or guardrails to prompt the LLM for a revised fix.
 """
 
 from src.application.session_manager import SessionManager
-from src.domain.interfaces import BaseAgent
-from src.domain.interfaces import AIProvider
-from src.domain.models import PatchRecommendation
-from src.domain.models import RefactorRequest
+from src.domain.interfaces import AIProvider, BaseAgent
+from src.domain.models import PatchRecommendation, RefactorRequest
 from src.utils import get_logger
 
 logger = get_logger(__name__)

@@ -5,8 +5,7 @@ safety net before any destructive filesystem modifications occur.
 """
 
 from src.application.session_manager import SessionManager
-from src.domain.interfaces import BaseAgent
-from src.domain.interfaces import Repository
+from src.domain.interfaces import BaseAgent, Repository
 from src.domain.models import PatchRecommendation
 from src.utils import get_logger
 
