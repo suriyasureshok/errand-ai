@@ -25,11 +25,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         # Ensure dev tools are installed for CI
-        pip install pytest pytest-asyncio black
+        pip install pytest pytest-asyncio black==24.2.0
 
     - name: Enforce Code Formatting (Black)
       run: |
-        black --check src/
+        black --check src/ --target-version py312
 
     - name: Execute Unit Test Suite
       # Run pytest and output standard coverage/status
