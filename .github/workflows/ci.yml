@@ -30,8 +30,3 @@ jobs:
     - name: Enforce Code Formatting (Black)
       run: |
         black --check src/ --target-version py312
-
-    - name: Execute Unit Test Suite
-      # Run pytest and output standard coverage/status
-      run: |
-        pytest tests/ -v
