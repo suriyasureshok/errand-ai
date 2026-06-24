@@ -1,57 +1,67 @@
+"""Centralized logging configuration for the Errand AI pipeline.
+
+This module provides a unified logging factory to ensure all agents and
+infrastructure components emit logs with a consistent format, severity
+level, and output destination.
+"""
+
 import logging
 import sys
-from pathlib import Path
-from typing import Optional
 
-# Standardize the output format across the entire application
-LOG_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
-DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+# Define the standard log format used across the entire application
+_LOG_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
-def setup_logger(
-    level: int = logging.INFO, log_file: Optional[Path] = None
-) -> logging.Logger:
+def setup_root_logger(level: str = "INFO") -> None:
+    """Configures the root logger for the application.
+
+    This function should be called exactly once at the entry point of the
+    application (e.g., in `main.py`). It sets up the stdout handler and
+    establishes the global formatting rules.
+
+    Args:
+        level (str, optional): The minimal logging severity level to record.
+            Valid values are 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'.
+            Defaults to "INFO".
+
+    Raises:
+        ValueError: If the provided log level string is invalid.
     """
-    Bootstraps the root logger for the Errand AI application.
-    This should be called exactly once by the Session Manager on startup.
-    """
-    # Get the root logger
-    root_logger = logging.getLogger()
-    root_logger.setLevel(level)
+    numeric_level = getattr(logging, level.upper(), None)
+    if not isinstance(numeric_level, int):
+        raise ValueError(f"Invalid log level: {level}")
 
     # Clear any existing handlers to prevent duplicate log entries
-    # if setup_logger is accidentally called multiple times.
+    root_logger = logging.getLogger()
     if root_logger.hasHandlers():
         root_logger.handlers.clear()
 
-    formatter = logging.Formatter(fmt=LOG_FORMAT, datefmt=DATE_FORMAT)
-
-    # 1. Console Handler (Streams to Docker logs)
+    # Configure the stdout handler for container/terminal friendly output
     console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(level)
+    console_handler.setLevel(numeric_level)
+
+    # Apply the standard pipeline formatter
+    formatter = logging.Formatter(fmt=_LOG_FORMAT, datefmt=_DATE_FORMAT)
     console_handler.setFormatter(formatter)
+
+    # Attach to root and set global level
     root_logger.addHandler(console_handler)
-
-    # 2. File Handler (Routes to .errand-ai/logs/retry-n.log)
-    if log_file:
-        # Ensure the .errand-ai/logs directory exists before writing
-        log_file.parent.mkdir(parents=True, exist_ok=True)
-
-        file_handler = logging.FileHandler(log_file, mode="a", encoding="utf-8")
-        # We often want DEBUG level in the file even if console is INFO
-        file_handler.setLevel(logging.DEBUG)
-        file_handler.setFormatter(formatter)
-        root_logger.addHandler(file_handler)
-
-    return root_logger
+    root_logger.setLevel(numeric_level)
 
 
-def get_logger(module_name: str) -> logging.Logger:
+def get_logger(name: str) -> logging.Logger:
+    """Retrieves a configured logger instance for a specific module.
+
+    This acts as the standardized factory for all logging within the system.
+    It automatically inherits the formatting and handlers from the root
+    logger configured by `setup_root_logger`.
+
+    Args:
+        name (str): The name of the module requesting the logger. This should
+            almost always be passed as `__name__` from the calling file.
+
+    Returns:
+        logging.Logger: A logger instance bound to the given module name.
     """
-    Utility function to retrieve a standardized logger for a specific module.
-
-    Usage:
-        from src.utils.logger import get_logger
-        logger = get_logger(__name__)
-    """
-    return logging.getLogger(module_name)
+    return logging.getLogger(name)
