@@ -1,17 +1,13 @@
-from typing import Any
+from src.application import SessionManager
+from src.domain.interfaces import BaseAgent
+from src.domain.models import GuardrailResult
+from src.domain.models import PatchRecommendation
+from src.utils.logger import get_logger
 
-from src.application.session_manager import (
-    SessionManager,
-)
-from src.domain.interfaces.agent import (
-    BaseAgent,
-)
-from src.domain.models.patch_recommendation import (
-    PatchRecommendation,
-)
+logger = get_logger(__name__)
 
 
-class GuardrailAgent(BaseAgent):
+class GuardrailAgent(BaseAgent[PatchRecommendation, GuardrailResult]):
     BLOCKED_PATTERNS = [
         "os.system(",
         "subprocess.run(",
@@ -28,41 +24,28 @@ class GuardrailAgent(BaseAgent):
         "package-lock.json",
     ]
 
-    def __init__(
-        self,
-        session_manager: SessionManager,
-    ) -> None:
+    def __init__(self, session_manager: SessionManager) -> None:
         self.session_manager = session_manager
 
-    def execute(
-        self,
-        context: dict[str, Any],
-    ) -> dict[str, Any]:
-        recommendation: PatchRecommendation = context["patch_recommendation"]
-
+    async def execute(self, recommendation: PatchRecommendation) -> GuardrailResult:
+        logger.info("Evaluating patch against safety guardrails...")
         diff = recommendation.unified_diff
 
         for pattern in self.BLOCKED_PATTERNS:
             if pattern in diff:
-                context["guardrail_passed"] = False
-
-                context["guardrail_reason"] = f"Blocked pattern: " f"{pattern}"
-
-                return context
+                reason = f"Blocked execution pattern detected: {pattern}"
+                logger.warning(f"Guardrail failed: {reason}")
+                self.session_manager.append_event("guardrail_rejected", reason)
+                return GuardrailResult(passed=False, recommendation=recommendation, reason=reason)
 
         for file_name in self.BLOCKED_FILES:
             if file_name in diff:
-                context["guardrail_passed"] = False
+                reason = f"Protected file modification detected: {file_name}"
+                logger.warning(f"Guardrail failed: {reason}")
+                self.session_manager.append_event("guardrail_rejected", reason)
+                return GuardrailResult(passed=False, recommendation=recommendation, reason=reason)
 
-                context["guardrail_reason"] = f"Protected file: " f"{file_name}"
-
-                return context
-
-        self.session_manager.append_event(
-            "guardrail_passed",
-            "Patch approved",
-        )
-
-        context["guardrail_passed"] = True
-
-        return context
+        logger.info("Patch passed all safety guardrails.")
+        self.session_manager.append_event("guardrail_passed", "Patch approved by static analysis")
+        
+        return GuardrailResult(passed=True, recommendation=recommendation)

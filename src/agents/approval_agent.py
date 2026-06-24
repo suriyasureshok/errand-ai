@@ -1,57 +1,45 @@
-import asyncio
-from typing import Any
+from src.application import SessionManager
+from src.domain.interfaces import BaseAgent
+from src.domain.interfaces import Notifier
+from src.domain.models import ApprovalResult
+from src.domain.models import PatchRecommendation
+from src.utils.logger import get_logger
 
-from src.application.session_manager import (
-    SessionManager,
-)
-from src.domain.interfaces.agent import (
-    BaseAgent,
-)
-from src.domain.models.patch_recommendation import (
-    PatchRecommendation,
-)
-from src.infrastructure.notifications.telegram import (
-    TelegramClient,
-)
+logger = get_logger(__name__)
 
 
-class ApprovalAgent(BaseAgent):
+class ApprovalAgent(BaseAgent[PatchRecommendation, ApprovalResult]):
     def __init__(
         self,
-        telegram_client: TelegramClient,
+        notifier: Notifier,
         session_manager: SessionManager,
     ) -> None:
-        self.telegram_client = telegram_client
+        self.notifier = notifier
         self.session_manager = session_manager
 
-    def execute(
-        self,
-        context: dict[str, Any],
-    ) -> dict[str, Any]:
-        recommendation: PatchRecommendation = context["patch_recommendation"]
-
-        approval_message = f"""
-Tests Failed
-
-Root Cause:
-{recommendation.root_cause}
-
-Suggested Fix:
-{recommendation.proposed_solution}
-
-Diff:
-{recommendation.unified_diff}
-
-Approve?
-"""
-
-        asyncio.run(self.telegram_client.request_approval(approval_message))
+    async def execute(self, recommendation: PatchRecommendation) -> ApprovalResult:
+        logger.info("Requesting human approval...")
+        
+        summary = (
+            f"Root Cause Analysis:\n{recommendation.root_cause}\n\n"
+            f"Proposed Solution:\n{recommendation.proposed_solution}"
+        )
 
         self.session_manager.append_event(
             "approval_requested",
-            "Telegram approval sent",
+            "Notification dispatched to human reviewer"
         )
 
-        context["approval_status"] = "pending"
+        # Execution halts here until the notifier returns a result
+        result = await self.notifier.request_approval(
+            summary=summary,
+            diff=recommendation.unified_diff,
+        )
 
-        return context
+        logger.info(f"Approval process concluded with status: {result.status.name}")
+        self.session_manager.append_event(
+            "approval_concluded",
+            f"Status: {result.status.name}"
+        )
+
+        return result
