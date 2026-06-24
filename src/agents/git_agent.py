@@ -1,33 +1,33 @@
-from pathlib import Path
-from typing import Any
+from src.application import SessionManager
+from src.domain.interfaces import BaseAgent
+from src.domain.models import PatchRecommendation
+from src.infrastructure.git import GitClient
+from src.utils.logger import get_logger
 
-from src.application.session_manager import SessionManager
-from src.domain.interfaces.agent import BaseAgent
-from src.infrastructure.git.git_client import GitClient
+logger = get_logger(__name__)
 
 
-class GitAgent(BaseAgent):
+class GitAgent(BaseAgent[PatchRecommendation, PatchRecommendation]):
     def __init__(
         self,
         session_manager: SessionManager,
+        git_client: GitClient,
     ) -> None:
         self.session_manager = session_manager
+        self.git_client = git_client
 
-    def execute(
-        self,
-        context: dict[str, Any],
-    ) -> dict[str, Any]:
-        workspace = Path(context["workspace"])
+    async def execute(self, recommendation: PatchRecommendation) -> PatchRecommendation:
+        session = self.session_manager.load_session()
+        retry_number = session.current_retry
 
-        retry_number = context["retry_number"]
-
-        git_client = GitClient(workspace=workspace)
-
-        git_client.create_checkpoint(retry_number=retry_number)
+        logger.info("GitAgent: Establishing recovery checkpoint before code modification.")
+        
+        await self.git_client.create_checkpoint(retry_number=retry_number)
 
         self.session_manager.append_event(
             "git_checkpoint_created",
-            (f"Retry #{retry_number}"),
+            f"Retry #{retry_number}"
         )
 
-        return context
+        # Pass the recommendation unmodified down the pipeline
+        return recommendation

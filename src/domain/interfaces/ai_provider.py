@@ -13,32 +13,32 @@ class AIProvider(ABC):
     - Gemini
     - NVIDIA NIM
     - OpenAI
-    - LM Studio
     - Any OpenAI-compatible endpoint
     """
 
     @abstractmethod
-    def run(
+    async def run(
         self,
         prompt: str,
         system_prompt: str | None = None,
         response_schema: type[T] | None = None,
     ) -> T:
         """
-        Execute an LLM request.
+        Execute an asynchronous LLM request.
 
         Args:
             prompt:
-                Main user prompt.
+                Main user prompt containing context and instructions.
 
             system_prompt:
-                Optional system instructions.
+                Optional system instructions for role-playing or constraints.
 
             response_schema:
-                Optional Pydantic model used to validate
-                and structure the response.
+                Optional Pydantic model used to validate and force
+                structured JSON output from the model.
 
         Returns:
-            Structured or raw model response.
+            The instantiated Pydantic model containing the structured response,
+            or a raw string if no schema is provided.
         """
         raise NotImplementedError

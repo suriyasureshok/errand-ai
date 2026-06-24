@@ -1,9 +1,9 @@
-from typing import Any
+from src.application import SessionManager
+from src.domain.interfaces import AIProvider, BaseAgent
+from src.domain.models import FailureAnalysis, TestResult
+from src.utils.logger import get_logger
 
-from src.application.session_manager import SessionManager
-from src.domain.interfaces.agent import BaseAgent
-from src.domain.interfaces.ai_provider import AIProvider
-from src.domain.models.failure_analysis import FailureAnalysis
+logger = get_logger(__name__)
 
 
 class LogAnalyzerAgent(BaseAgent):
@@ -15,47 +15,32 @@ class LogAnalyzerAgent(BaseAgent):
         self.ai_provider = ai_provider
         self.session_manager = session_manager
 
-    def execute(
-        self,
-        context: dict[str, Any],
-    ) -> dict[str, Any]:
-        stdout = context["test_stdout"]
-        stderr = context["test_stderr"]
-
+    async def execute(self, test_result: TestResult) -> FailureAnalysis:
+        logger.info("Starting log analysis...")
         self.session_manager.append_event(
-            "log_analysis_started",
-            "Analyzing failed test output",
+            "log_analysis_started", "Analyzing failed test output"
         )
 
         prompt = f"""
-Analyze the following test failure.
-
-Return:
-
-1. Error type
-2. Root cause summary
-3. Relevant source files
-4. Relevant test files
-5. Related modules
+Analyze the following test failure and extract the required structured data.
 
 STDOUT:
-{stdout}
+{test_result.stdout}
 
 STDERR:
-{stderr}
+{test_result.stderr}
 """
 
-        analysis: FailureAnalysis = self.ai_provider.run(
+        # Assuming AIProvider.run is an async method that enforces the Pydantic schema
+        analysis: FailureAnalysis = await self.ai_provider.run(
             prompt=prompt,
-            system_prompt=("You are an expert software " "debugging assistant."),
+            system_prompt="You are an expert software debugging assistant. Provide structured root cause analysis.",
             response_schema=FailureAnalysis,
         )
 
+        logger.info(f"Analysis complete. Detected error: {analysis.error_type}")
         self.session_manager.append_event(
-            "log_analysis_completed",
-            analysis.error_type,
+            "log_analysis_completed", f"Detected: {analysis.error_type}"
         )
 
-        context["failure_analysis"] = analysis
-
-        return context
+        return analysis
