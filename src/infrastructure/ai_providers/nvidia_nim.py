@@ -1,12 +1,19 @@
+"""NVIDIA NIM infrastructure provider.
+
+This module implements the AIProvider interface utilizing the OpenAI SDK
+pointed at NVIDIA's NIM endpoints.
+"""
+
 import json
-from typing import Any, TypeVar
+from typing import Optional, Type, TypeVar, Union
 
 from openai import AsyncOpenAI
 from pydantic import BaseModel
 
-from src.application import Config
-from src.domain.interfaces import AIProvider
+from src.application.config import Config
+from src.domain.interfaces.ai_provider import AIProvider
 from src.utils.logger import get_logger
+from src.utils.retry import async_retry
 
 logger = get_logger(__name__)
 
@@ -14,42 +21,50 @@ T = TypeVar("T", bound=BaseModel)
 
 
 class NvidiaNIMProvider(AIProvider):
+    """Implementation of AIProvider for NVIDIA NIM endpoints."""
+
     def __init__(self, config: Config) -> None:
+        """Initializes the NVIDIA NIM Provider.
+
+        Args:
+            config (Config): Application configuration containing the API key and base URL.
+        """
         self._config = config
-        
-        # Instantiate the asynchronous OpenAI client
         self._client = AsyncOpenAI(
             base_url=config.base_url,
             api_key=config.api_key,
         )
 
+    @async_retry(max_retries=3, base_delay=2.0)
     async def run(
         self,
         prompt: str,
-        system_prompt: str | None = None,
-        response_schema: type[T] | None = None,
-    ) -> T | str:
+        system_prompt: Optional[str] = None,
+        response_schema: Optional[Type[T]] = None,
+    ) -> Union[str, T]:
+        """Executes an asynchronous LLM generation request with retry logic.
+
+        Args:
+            prompt (str): The main user prompt containing context.
+            system_prompt (Optional[str]): Optional system-level instructions.
+            response_schema (Optional[Type[T]]): A Pydantic model to enforce JSON output.
+
+        Returns:
+            Union[str, T]: The hydrated Pydantic model or a raw string.
+
+        Raises:
+            ValueError: If the model returns an empty response or JSON validation fails.
+        """
         messages: list[dict[str, str]] = []
 
         if system_prompt is not None:
-            messages.append(
-                {
-                    "role": "system",
-                    "content": system_prompt,
-                }
-            )
+            messages.append({"role": "system", "content": system_prompt})
 
-        messages.append(
-            {
-                "role": "user",
-                "content": prompt,
-            }
-        )
+        messages.append({"role": "user", "content": prompt})
 
-        logger.debug(f"Sending request to model: {self._config.model}")
+        logger.debug(f"Sending request to NVIDIA NIM model: {self._config.model}")
 
         if response_schema is not None:
-            # 1. Inject the Pydantic schema into the system prompt so the model knows the exact shape
             schema_json = json.dumps(response_schema.model_json_schema())
             json_instruction = (
                 f"\n\nYou MUST return your answer as a single, strictly valid JSON object. "
@@ -57,42 +72,40 @@ class NvidiaNIMProvider(AIProvider):
                 f"DO NOT echo or return the schema itself. Populate the fields with your actual analysis.\n\n"
                 f"SCHEMA TO FOLLOW:\n{schema_json}"
             )
-            
+
             if not messages or messages[0]["role"] != "system":
                 messages.insert(0, {"role": "system", "content": json_instruction})
             else:
                 messages[0]["content"] += json_instruction
 
-            # 2. Call the standard API endpoint (supported by NVIDIA, Ollama, LM Studio, etc.)
             completion = await self._client.chat.completions.create(
                 model=self._config.model,
                 messages=messages,
-                response_format={"type": "json_object"},  # Force JSON mode
-                temperature=0.1,  # Keep it deterministic
+                response_format={"type": "json_object"},
+                temperature=0.1,
             )
-            
+
             content = completion.choices[0].message.content
-            
+
             if not content:
                 logger.error("Model returned an empty response.")
                 raise ValueError("Model returned empty response.")
-                
-            # 3. Manually parse and validate the JSON string into the Pydantic model
+
             try:
-                parsed = response_schema.model_validate_json(content)
-                return parsed
+                return response_schema.model_validate_json(content)
             except Exception as e:
-                logger.error(f"Failed to parse model output into schema. Raw output: {content}")
+                logger.error(
+                    f"Failed to parse model output into schema. Raw output: {content}"
+                )
                 raise ValueError(f"JSON validation failed: {e}")
 
-        # If no schema is provided, just return the raw text
         completion = await self._client.chat.completions.create(
             model=self._config.model,
             messages=messages,
         )
+
         content = completion.choices[0].message.content
-        
         if content is None:
             raise ValueError("Model returned empty response.")
-            
+
         return content
