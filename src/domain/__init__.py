@@ -12,13 +12,7 @@ Sub-packages:
         agents, infrastructure providers, and external integrations.
 """
 
-from .interfaces import (
-    AIProvider,
-    BaseAgent,
-    Guardrail,
-    Notifier,
-    Repository,
-)
+from .interfaces import AIProvider, BaseAgent, Guardrail, Notifier, Repository
 from .models import (
     ApprovalResult,
     ApprovalStatus,

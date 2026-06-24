@@ -8,8 +8,7 @@ before passing them down the pipeline.
 import ast
 
 from src.domain.interfaces import BaseAgent
-from src.domain.models import GuardrailResult
-from src.domain.models import PatchRecommendation
+from src.domain.models import GuardrailResult, PatchRecommendation
 from src.utils import get_logger
 
 logger = get_logger(__name__)

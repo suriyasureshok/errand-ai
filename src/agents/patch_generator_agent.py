@@ -6,10 +6,8 @@ context into an LLM and outputs a structured PatchRecommendation.
 
 import json
 
-from src.domain.interfaces import BaseAgent
-from src.domain.interfaces import AIProvider
-from src.domain.models import ContextPackage
-from src.domain.models import PatchRecommendation
+from src.domain.interfaces import AIProvider, BaseAgent
+from src.domain.models import ContextPackage, PatchRecommendation
 from src.utils import get_logger
 
 logger = get_logger(__name__)

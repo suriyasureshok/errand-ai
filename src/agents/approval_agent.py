@@ -6,10 +6,8 @@ notification infrastructure (e.g., Telegram).
 """
 
 from src.application.session_manager import SessionManager
-from src.domain.interfaces import BaseAgent
-from src.domain.interfaces import Notifier
-from src.domain.models import ApprovalResult
-from src.domain.models import PatchRecommendation
+from src.domain.interfaces import BaseAgent, Notifier
+from src.domain.models import ApprovalResult, PatchRecommendation
 from src.utils import get_logger
 
 logger = get_logger(__name__)
